@@ -1,7 +1,11 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use structopt::StructOpt;
+use tempdir::TempDir;
+use uuid::Uuid;
+use zip_archive::{Archiver, Format};
+
 mod module_link;
 
 fn parse_map_dirs(s: &str) -> anyhow::Result<(PathBuf, PathBuf)> {
@@ -25,6 +29,10 @@ pub enum App {
 
     /// Package directories into Wasm module
     Pack {
+        /// Whether files within the mapped directory are saved in compressed form
+        #[structopt(long, short)]
+        compress: bool,
+
         /// The input Wasm module's file path.
         #[structopt(parse(from_os_str))]
         input: PathBuf,
@@ -47,6 +55,7 @@ impl App {
                 module_link::link(&bytes);
             }
             App::Pack {
+                compress,
                 input,
                 map_dirs,
                 output,
@@ -60,6 +69,11 @@ impl App {
                 wizer.keep_init_func(true);
                 wizer.wasm_bulk_memory(true);
                 for (guest_dir, host_dir) in map_dirs {
+                    let host_dir = if compress {
+                        Self::compressed_host_dir(&host_dir)?
+                    } else {
+                        host_dir
+                    };
                     wizer.map_dir(guest_dir, host_dir);
                 }
                 let wasm_bytes = std::fs::read(&input)?;
@@ -68,5 +82,21 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    fn compressed_host_dir(
+        dir: &(impl Into<PathBuf> + std::convert::AsRef<std::path::Path> + std::fmt::Debug),
+    ) -> Result<PathBuf> {
+        let tmp_dir = TempDir::new(&Uuid::new_v4().to_string())?;
+        let mut archiver = Archiver::new();
+        archiver.push(dir);
+        archiver.set_destination(tmp_dir.path());
+        archiver.set_format(Format::Xz);
+        if archiver.archive().is_ok() {
+            println!("temp path is {:?}", tmp_dir);
+            Ok(tmp_dir.path().to_path_buf())
+        } else {
+            Err(anyhow!("error archiving directory {:?}", dir))
+        }
     }
 }

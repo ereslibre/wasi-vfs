@@ -10,3 +10,7 @@ name = "wasi-vfs"
 anyhow = "1.0.40"
 structopt = "0.3.21"
 wizer = { git = "https://github.com/bytecodealliance/wizer.git", rev = "refs/pull/89/head" }
+tempdir = "0.3.7"
+uuid = { version = "1.3.0", features = ["v4"] }
+xz2 = "0.1.7"
+zip_archive = "1.2.2"
