@@ -15,7 +15,8 @@ crate-type = ["staticlib", "cdylib"]
 [dependencies]
 wasi = "0.11.0"
 wee_alloc = { version = "0.4.5", optional = true }
-
+#xz2 = { version = "0.1.7", features = ["static"] }
+xz2 = { path = "../../alexcrichton/xz2-rs", features = ["static"] }
 
 [build-dependencies]
 cc = "1.0"

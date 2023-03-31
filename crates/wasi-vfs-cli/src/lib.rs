@@ -1,10 +1,12 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use structopt::StructOpt;
 use tempdir::TempDir;
 use uuid::Uuid;
-use zip_archive::{Archiver, Format};
+use walkdir::WalkDir;
+use std::io::Write;
+use xz2::write::XzEncoder;
 
 mod module_link;
 
@@ -41,6 +43,9 @@ pub enum App {
         #[structopt(long = "mapdir", value_name = "GUEST_DIR::HOST_DIR", parse(try_from_str = parse_map_dirs))]
         map_dirs: Vec<(PathBuf, PathBuf)>,
 
+        #[structopt(skip)]
+        tmp_dirs: Vec<TempDir>,
+
         /// The file path to write the output Wasm module to.
         #[structopt(long, short, parse(from_os_str))]
         output: PathBuf,
@@ -58,6 +63,7 @@ impl App {
                 compress,
                 input,
                 map_dirs,
+                mut tmp_dirs,
                 output,
             } => {
                 std::env::set_var("__WASI_VFS_PACKING", "1");
@@ -70,10 +76,15 @@ impl App {
                 wizer.wasm_bulk_memory(true);
                 for (guest_dir, host_dir) in map_dirs {
                     let host_dir = if compress {
-                        Self::compressed_host_dir(&host_dir)?
+                        let tmp_dir = TempDir::new(&Uuid::new_v4().to_string())?;
+                        Self::compressed_host_dir(&host_dir, tmp_dir.path())?;
+                        let res = tmp_dir.path().to_path_buf();
+                        tmp_dirs.push(tmp_dir);
+                        res
                     } else {
                         host_dir
                     };
+                    println!("mapping {:?} to {:?}", host_dir, guest_dir);
                     wizer.map_dir(guest_dir, host_dir);
                 }
                 let wasm_bytes = std::fs::read(&input)?;
@@ -85,18 +96,22 @@ impl App {
     }
 
     fn compressed_host_dir(
-        dir: &(impl Into<PathBuf> + std::convert::AsRef<std::path::Path> + std::fmt::Debug),
-    ) -> Result<PathBuf> {
-        let tmp_dir = TempDir::new(&Uuid::new_v4().to_string())?;
-        let mut archiver = Archiver::new();
-        archiver.push(dir);
-        archiver.set_destination(tmp_dir.path());
-        archiver.set_format(Format::Xz);
-        if archiver.archive().is_ok() {
-            println!("temp path is {:?}", tmp_dir);
-            Ok(tmp_dir.path().to_path_buf())
-        } else {
-            Err(anyhow!("error archiving directory {:?}", dir))
+        dir: &(impl Into<PathBuf> + std::convert::AsRef<Path> + std::fmt::Debug),
+        tmp_dir: &Path,
+    ) -> Result<()> {
+        for entry in WalkDir::new(dir) {
+            let current_entry = entry?;
+            let relative_path = current_entry.path().strip_prefix(&dir)?;
+            let target_path = tmp_dir.join(relative_path);
+            if current_entry.file_type().is_dir() {
+                std::fs::create_dir_all(&target_path)?;
+            } else {
+                let contents = std::fs::read(current_entry.path())?;
+                let mut compressed_contents = XzEncoder::new(Vec::new(), 9);
+                compressed_contents.write_all(&contents)?;
+                std::fs::write(&target_path, compressed_contents.finish()?)?;
+            }
         }
+        Ok(())
     }
 }

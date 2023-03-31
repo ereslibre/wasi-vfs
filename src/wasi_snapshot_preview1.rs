@@ -2,7 +2,7 @@ use core::slice;
 use std::{
     ffi::{CStr, OsStr},
     mem::MaybeUninit,
-    path::Path,
+    path::Path, io::Read,
 };
 use wasi::{
     CiovecArray, Dircookie, Event, Fd, Fdflags, Fdstat, Filedelta, Filesize, Filestat, Fstflags,
@@ -10,6 +10,7 @@ use wasi::{
     Timestamp, RIGHTS_FD_ADVISE, RIGHTS_FD_FILESTAT_GET, RIGHTS_FD_READ, RIGHTS_FD_READDIR,
     RIGHTS_PATH_OPEN,
 };
+use xz2::read::XzDecoder;
 
 use crate::{
     embed::{Node, NodeDirBody, NodeFileBody, NodeIdTrait, Storage},
@@ -358,9 +359,12 @@ pub(crate) unsafe fn fd_read<S: Storage>(
             let node = fs.embedded_fs.get_node(vfd)?;
             match node {
                 Node::Dir { .. } => Err(wasi::ERRNO_ISDIR.into()),
-                Node::File(body) => {
+                Node::File(compressed_body) => {
                     let open = fs.embedded_fs.get_fd_entry(vfd)?;
-                    let mut cursor = std::io::Cursor::new(body.content());
+                    let mut decompressor = XzDecoder::new(compressed_body.content());
+                    let mut body = Vec::new();
+                    decompressor.read_to_end(&mut body).unwrap(); // fixme: ereslibre
+                    let mut cursor = std::io::Cursor::new(body);
                     cursor.set_position(open.offset as u64);
                     let read_bytes = read_bytes(cursor, iovs)?;
                     let open = fs.embedded_fs.get_fd_entry_mut(vfd)?;
