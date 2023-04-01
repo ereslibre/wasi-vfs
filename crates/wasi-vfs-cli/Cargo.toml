@@ -13,4 +13,4 @@ tempdir = "0.3.7"
 uuid = { version = "1.3.0", features = ["v4"] }
 walkdir = "2.3.3"
 wizer = { git = "https://github.com/bytecodealliance/wizer.git", rev = "65e345fb2bd5b5177d4be55af747edc28035c35c" }
-xz2 = { path = "../../../../alexcrichton/xz2-rs" }
+xz2 = { git = "https://github.com/ereslibre/xz2-rs.git", branch = "wasm32-wasi", features = ["static"] }
