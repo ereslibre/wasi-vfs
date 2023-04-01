@@ -1,2 +1,2 @@
 [patch.crates-io]
-xz2 = { path = "../../alexcrichton/xz2-rs" }
+xz2 = { git = "https://github.com/ereslibre/xz2-rs.git", branch = "wasm32-wasi", features = ["static"] }
