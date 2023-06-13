@@ -1024,7 +1024,7 @@ checksum = "518ef76f2f87365916b142844c16d8fefd85039bc5699050210a7778ee1cd1de"
 [[package]]
 name = "lzma-sys"
 version = "0.1.20"
-source = "git+https://github.com/ereslibre/xz2-rs.git?branch=wasm32-wasi#8d209e9f894fc7de5b749a1c28b0b6066971b358"
+source = "git+https://github.com/ereslibre/xz2-rs.git?branch=wasm32-wasi#58b7fcca15889c6c0172d437b49500143ac67505"
 dependencies = [
  "cc",
  "libc",
@@ -2494,7 +2494,7 @@ dependencies = [
 [[package]]
 name = "xz2"
 version = "0.1.7"
-source = "git+https://github.com/ereslibre/xz2-rs.git?branch=wasm32-wasi#8d209e9f894fc7de5b749a1c28b0b6066971b358"
+source = "git+https://github.com/ereslibre/xz2-rs.git?branch=wasm32-wasi#58b7fcca15889c6c0172d437b49500143ac67505"
 dependencies = [
  "lzma-sys",
 ]

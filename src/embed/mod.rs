@@ -48,6 +48,7 @@ pub(crate) trait Storage {
         &mut self,
         parent: (Self::NodeId, Self::LinkId),
         name: String,
+        is_compressed: bool,
     ) -> (Self::NodeId, Self::LinkId);
 
     /// Creates a new file node under the given parent node.
@@ -56,6 +57,7 @@ pub(crate) trait Storage {
         parent: (Self::NodeId, Self::LinkId),
         name: String,
         content: Vec<u8>,
+        is_compressed: bool,
     ) -> (Self::NodeId, Self::LinkId);
 
     /// Resolve a node from its id.
@@ -182,9 +184,10 @@ impl<S: Storage> EmbeddedFs<S> {
         dir_node: S::NodeId,
         dir_link: S::LinkId,
         relpath: &str,
+        is_compressed: bool,
     ) -> Result<(), u16> {
-        let (cursor, filename) = self.create_intermediate_dirs(dir_node, dir_link, relpath)?;
-        self.storage.new_dir(cursor, filename.to_string());
+        let (cursor, filename) = self.create_intermediate_dirs(dir_node, dir_link, relpath, is_compressed)?;
+        self.storage.new_dir(cursor, filename.to_string(), is_compressed);
         Ok(())
     }
 
@@ -194,9 +197,10 @@ impl<S: Storage> EmbeddedFs<S> {
         dir_link: S::LinkId,
         relpath: &str,
         content: Vec<u8>,
+        is_compressed: bool,
     ) -> Result<(), u16> {
-        let (cursor, filename) = self.create_intermediate_dirs(dir_node, dir_link, relpath)?;
-        self.storage.new_file(cursor, filename.to_string(), content);
+        let (cursor, filename) = self.create_intermediate_dirs(dir_node, dir_link, relpath, is_compressed)?;
+        self.storage.new_file(cursor, filename.to_string(), content, is_compressed);
         Ok(())
     }
 
@@ -205,6 +209,7 @@ impl<S: Storage> EmbeddedFs<S> {
         base_node: S::NodeId,
         base_link: S::LinkId,
         mut relpath: &'path str,
+        is_compressed: bool
     ) -> Result<((S::NodeId, S::LinkId), &'path str), u16> {
         let mut cursor = match self.storage.get_inode(&base_node) {
             Node::Dir { .. } => (base_node, base_link),
@@ -237,7 +242,7 @@ impl<S: Storage> EmbeddedFs<S> {
             }
             // create a new intermediate directory
             {
-                let (new_dir_id, new_link_id) = self.storage.new_dir(cursor, component.to_string());
+                let (new_dir_id, new_link_id) = self.storage.new_dir(cursor, component.to_string(), is_compressed);
                 cursor = (new_dir_id, new_link_id);
             }
         }

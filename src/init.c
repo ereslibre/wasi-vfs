@@ -8,3 +8,10 @@ void export_wasi_vfs_pack_fs(void) {
   extern void __internal_wasi_vfs_pack_fs(void);
   __internal_wasi_vfs_pack_fs();
 }
+
+#pragma clang diagnostic ignored "-Wunknown-attributes"
+__attribute__((export_name("wasi_vfs_pack_fs_compressed")))
+void export_wasi_vfs_pack_fs_compressed(void) {
+  extern void __internal_wasi_vfs_pack_fs_compressed(void);
+  __internal_wasi_vfs_pack_fs_compressed();
+}

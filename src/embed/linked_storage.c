@@ -76,6 +76,7 @@ struct wasi_vfs_dirent {
 struct wasi_vfs_node {
   bool is_dir;
   size_t count;
+  bool is_compressed;
   union {
     uint8_t *data;
     struct wasi_vfs_dirent *dirents;
@@ -94,11 +95,12 @@ static void insert_dirent(struct wasi_vfs_node *node,
   node->count++;
 }
 
-static struct wasi_vfs_node *new_node(bool is_dir) {
+static struct wasi_vfs_node *new_node(bool is_dir, bool is_compressed) {
   struct wasi_vfs_node *node = malloc(sizeof(struct wasi_vfs_node));
   node->is_dir = is_dir;
   node->count = 0;
   node->data = NULL;
+  node->is_compressed = is_compressed;
   return node;
 }
 
@@ -128,18 +130,18 @@ void wasi_vfs_embed_linked_storage_free(
 }
 
 node_link_t wasi_vfs_embed_linked_storage_preopen_new_dir(
-    struct wasi_vfs_embed_linked_storage *self) {
+    struct wasi_vfs_embed_linked_storage *self, bool is_compressed) {
   (void)self;
-  struct wasi_vfs_node *node = new_node(true);
+  struct wasi_vfs_node *node = new_node(true, is_compressed);
   struct wasi_vfs_link *link = new_link(node);
   return (node_link_t){node, link};
 }
 
 node_link_t wasi_vfs_embed_linked_storage_new_dir(
     struct wasi_vfs_embed_linked_storage *self, const node_link_t *parent,
-    char *name) {
+    char *name, bool is_compressed) {
   (void)self;
-  struct wasi_vfs_node *node = new_node(true);
+  struct wasi_vfs_node *node = new_node(true, is_compressed);
   struct wasi_vfs_link *link = new_link(node);
   link->parent = parent->link;
 
@@ -153,12 +155,13 @@ node_link_t wasi_vfs_embed_linked_storage_new_dir(
 
 node_link_t wasi_vfs_embed_linked_storage_new_file(
     struct wasi_vfs_embed_linked_storage *self, const node_link_t *parent,
-    char *name, uint8_t *content, size_t content_len) {
+    char *name, uint8_t *content, size_t content_len, bool is_compressed) {
 
   (void)self;
-  struct wasi_vfs_node *node = new_node(false);
+  struct wasi_vfs_node *node = new_node(false, is_compressed);
   node->count = content_len;
   node->data = content;
+  node->is_compressed = is_compressed;
 
   struct wasi_vfs_link *link = new_link(node);
   link->parent = parent->link;

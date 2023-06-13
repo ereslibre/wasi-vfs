@@ -89,11 +89,12 @@ struct InnerLink {
 extern "C" {
     fn wasi_vfs_embed_linked_storage_new() -> *mut std::ffi::c_void;
     fn wasi_vfs_embed_linked_storage_free(context: *mut std::ffi::c_void);
-    fn wasi_vfs_embed_linked_storage_preopen_new_dir(context: *mut std::ffi::c_void) -> NodeLink;
+    fn wasi_vfs_embed_linked_storage_preopen_new_dir(context: *mut std::ffi::c_void, is_compressed: bool) -> NodeLink;
     fn wasi_vfs_embed_linked_storage_new_dir(
         context: *mut std::ffi::c_void,
         parent: *const NodeLink,
         name: *const i8,
+        is_compressed: bool,
     ) -> NodeLink;
     fn wasi_vfs_embed_linked_storage_new_file(
         context: *mut std::ffi::c_void,
@@ -101,6 +102,7 @@ extern "C" {
         name: *const i8,
         content: *const u8,
         content_len: usize,
+        is_compressed: bool,
     ) -> NodeLink;
     fn wasi_vfs_embed_linked_storage_resolve_node_at(
         context: *mut std::ffi::c_void,
@@ -132,19 +134,19 @@ impl Storage for LinkedStorage {
 
     fn new_root_dir(&mut self) -> (NodeId, LinkId) {
         unsafe {
-            let ret = wasi_vfs_embed_linked_storage_preopen_new_dir(self.context);
+            let ret = wasi_vfs_embed_linked_storage_preopen_new_dir(self.context, false);
             (ret.node_id, ret.link_id)
         }
     }
 
-    fn new_dir(&mut self, parent: (NodeId, LinkId), name: String) -> (NodeId, LinkId) {
+    fn new_dir(&mut self, parent: (NodeId, LinkId), name: String, is_compressed: bool) -> (NodeId, LinkId) {
         unsafe {
             let name = CString::new(name).unwrap();
             let link = NodeLink {
                 node_id: parent.0,
                 link_id: parent.1,
             };
-            let result = wasi_vfs_embed_linked_storage_new_dir(self.context, &link, name.as_ptr());
+            let result = wasi_vfs_embed_linked_storage_new_dir(self.context, &link, name.as_ptr(), is_compressed);
             (result.node_id, result.link_id)
         }
     }
@@ -154,6 +156,7 @@ impl Storage for LinkedStorage {
         parent: (NodeId, LinkId),
         name: String,
         content: Vec<u8>,
+        is_compressed: bool,
     ) -> (NodeId, LinkId) {
         unsafe {
             let name = CString::new(name).unwrap();
@@ -169,6 +172,7 @@ impl Storage for LinkedStorage {
                 name.as_ptr(),
                 content.leak().as_ptr(),
                 content_len,
+                is_compressed,
             );
             (result.node_id, result.link_id)
         }

@@ -171,6 +171,38 @@ unsafe extern "C" fn __internal_wasi_vfs_pack_fs() {
     }
 }
 
+/// Packing-time entry point to scan the host file system.
+#[no_mangle]
+unsafe extern "C" fn __internal_wasi_vfs_pack_fs_compressed() {
+    extern "C" {
+        fn __wasi_vfs_force_link_init();
+    }
+    __wasi_vfs_force_link_init();
+
+    std::panic::set_hook(Box::new(|info| {
+        trace::print(format!("{}\n", info));
+    }));
+    let (mut fs, preopened_vfds) = if let Some((fs, vfds)) = GLOBAL_STATE.embedded_fs.take() {
+        (fs, vfds)
+    } else {
+        (EmbeddedFs::default(), vec![])
+    };
+
+    let (preopened_vfds, prestats) =
+        FsPacker::scan_preopened_dirs(&mut fs, preopened_vfds).unwrap();
+    let packer = FsPacker::new(fs, preopened_vfds).unwrap();
+    let fs = packer.pack(prestats).unwrap();
+    GLOBAL_STATE.embedded_fs = Some(fs);
+
+    #[cfg(not(feature = "module-linking"))]
+    {
+        extern "C" {
+            fn __wasilibc_deinitialize_environ();
+        }
+        __wasilibc_deinitialize_environ();
+    }
+}
+
 struct Prestat<S: Storage> {
     real_fd: u32,
     node_id: S::NodeId,
@@ -189,6 +221,7 @@ trait DirVisitor<S: Storage> {
         path: &str,
         fd: u32,
         preopened_id: (S::NodeId, S::LinkId),
+        is_compressed: bool,
     ) -> Result<(), u16>;
 
     fn visit_dir(
@@ -196,6 +229,7 @@ trait DirVisitor<S: Storage> {
         prefix: &str,
         fd: u32,
         preopened_id: (S::NodeId, S::LinkId),
+        is_compressed: bool,
     ) -> Result<(), u16>;
 }
 
@@ -204,6 +238,7 @@ fn walk_dir<S: Storage, V: DirVisitor<S>>(
     prefix: &str,
     fd: u32,
     preopened_id: (S::NodeId, S::LinkId),
+    is_compressed: bool,
 ) -> Result<(), u16> {
     const DIRENT_DEFAULT_BUFFER_SIZE: usize = 4096;
     let mut offset = 0;
@@ -272,8 +307,8 @@ fn walk_dir<S: Storage, V: DirVisitor<S>>(
                 .map_err(|e| e.raw())
                 .unwrap();
 
-                visitor.visit_dir(&path, child_fd, preopened_id)?;
-                walk_dir(visitor, &path, child_fd, preopened_id)?;
+                visitor.visit_dir(&path, child_fd, preopened_id, is_compressed)?;
+                walk_dir(visitor, &path, child_fd, preopened_id, is_compressed)?;
 
                 unsafe {
                     wasi::fd_close(child_fd).expect("failed to close fd");
@@ -294,7 +329,7 @@ fn walk_dir<S: Storage, V: DirVisitor<S>>(
                 }
                 .map_err(|e| e.raw())
                 .unwrap();
-                visitor.visit_file(&path, child_fd, preopened_id)?;
+                visitor.visit_file(&path, child_fd, preopened_id, is_compressed)?;
                 unsafe {
                     wasi::fd_close(child_fd).expect("failed to close fd");
                 }
@@ -357,7 +392,7 @@ impl<S: Storage> FsPacker<S> {
 
     fn pack(mut self, prestats: Vec<Prestat<S>>) -> Result<(EmbeddedFs<S>, Vec<Vfd>), u16> {
         for stat in prestats {
-            walk_dir(&mut self, "", stat.real_fd, (stat.node_id, stat.link_id))?;
+            walk_dir(&mut self, "", stat.real_fd, (stat.node_id, stat.link_id), false)?; // FIXME: ereslibre
         }
         Ok((self.fs, self.preopened_vfds))
     }
@@ -369,9 +404,10 @@ impl<S: Storage> DirVisitor<S> for FsPacker<S> {
         path: &str,
         _fd: u32,
         preopened_id: (S::NodeId, S::LinkId),
+        is_compressed: bool,
     ) -> Result<(), u16> {
         self.fs
-            .create_dir(preopened_id.0, preopened_id.1, path)
+            .create_dir(preopened_id.0, preopened_id.1, path, is_compressed)
             .unwrap();
         Ok(())
     }
@@ -381,6 +417,7 @@ impl<S: Storage> DirVisitor<S> for FsPacker<S> {
         path: &str,
         fd: u32,
         preopened_id: (S::NodeId, S::LinkId),
+        is_compressed: bool,
     ) -> Result<(), u16> {
         let stat = unsafe { wasi::fd_filestat_get(fd) }
             .map_err(|e| e.raw())
@@ -421,7 +458,7 @@ impl<S: Storage> DirVisitor<S> for FsPacker<S> {
             ));
         }
         self.fs
-            .create_file(preopened_id.0, preopened_id.1, path, buf)
+            .create_file(preopened_id.0, preopened_id.1, path, buf, is_compressed)
             .unwrap();
         Ok(())
     }
