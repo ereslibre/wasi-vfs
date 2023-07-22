@@ -1,6 +1,9 @@
 TRAMPOLINE_GEN = WASI_REPO=./crates/wasi-libc-trampoline-bindgen/WASI cargo run --package wasi-libc-trampoline-bindgen --
 LIB_WASI_VFS_A = target/wasm32-unknown-unknown/debug/libwasi_vfs.a
-.DEFAULT_GOAL = build
+.DEFAULT_GOAL = all
+
+.PHONY: all
+all: cli target/wasm32-unknown-unknown/debug/libwasi_vfs.a
 
 .PHONY: generate-trampoline build check
 
@@ -19,7 +22,7 @@ cli:
 	cargo +nightly build -p wasi-vfs-cli
 
 target/wasm32-unknown-unknown/debug/libwasi_vfs.a:
-	cargo +nightly build --target=wasm32-unknown-unknown
+	nix develop github:ereslibre/nixities#wasi-vfs-19 --command cargo +nightly build --target=wasm32-unknown-unknown
 
 .PHONY: clean
 clean:
