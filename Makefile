@@ -15,6 +15,9 @@ build:
 check: build
 	env LIB_WASI_VFS_A=$(LIB_WASI_VFS_A) ./tools/run-make-test.sh
 
+cli:
+	cargo +nightly build -p wasi-vfs-cli
+
 target/wasm32-unknown-unknown/debug/libwasi_vfs.a:
 	cargo +nightly build --target=wasm32-unknown-unknown
 
