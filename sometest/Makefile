@@ -8,11 +8,11 @@ some-test-with-vfs.wasm: main.c ../target/wasm32-unknown-unknown/debug/libwasi_v
 
 .PHONY: run
 run: some-test.wasm
-	wasmtime --mapdir .::. $<
+	nix run github:ereslibre/nixities#wasmtime -- --mapdir .::. $<
 
 .PHONY: run-empty-vfs
 run-empty-vfs: some-test-with-vfs.wasm
-	wasmtime --mapdir .::. $<
+	nix run github:ereslibre/nixities#wasmtime -- --mapdir .::. $<
 
 .PHONY: clean
 clean:

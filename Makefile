@@ -19,10 +19,13 @@ check: build
 	env LIB_WASI_VFS_A=$(LIB_WASI_VFS_A) ./tools/run-make-test.sh
 
 cli:
-	cargo +nightly build -p wasi-vfs-cli
+	nix develop github:ereslibre/nixities#clang --command -- cargo +nightly build -p wasi-vfs-cli
 
 target/wasm32-unknown-unknown/debug/libwasi_vfs.a:
-	nix develop github:ereslibre/nixities#wasi-vfs-19 --command cargo +nightly build --target=wasm32-unknown-unknown
+	nix develop github:ereslibre/nixities#wasi-vfs-19 --command -- cargo +nightly build --target=wasm32-unknown-unknown
+
+run: all
+	nix develop github:ereslibre/nixities#wasi-vfs-19 --command -- make  -C sometest
 
 .PHONY: clean
 clean:
